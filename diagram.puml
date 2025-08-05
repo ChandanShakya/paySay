@@ -1,0 +1,112 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+' Define stereotypes
+!define Model(x) << (M,#ADD8E6) x >>
+!define Service(x) << (S,#90EE90) x >>
+
+' Authentication Model
+class Admin Model("Authenticatable") {
+    +id : unsignedBigInteger <<PK>>
+    +totp_secret : string(255) [0..1]
+    +created_at : timestamp
+    +updated_at : timestamp
+    +deleted_at : timestamp [0..1]
+}
+
+' Eloquent Models
+class User Model("Model") {
+    +id : unsignedBigInteger <<PK>>
+    +name : string(255)
+    +email : string(255)
+    +created_at : timestamp
+    +updated_at : timestamp
+}
+
+class Expense Model("Model") {
+    +id : unsignedBigInteger <<PK>>
+    +date : date
+    +description : string(255)
+    +total_amount : decimal(10,2)
+    +details : text
+    +payer_id : unsignedBigInteger <<FK>>
+    +created_at : timestamp
+    +updated_at : timestamp
+    +deleted_at : timestamp [0..1]
+}
+
+class ExpenseItem Model("Model") {
+    +id : unsignedBigInteger <<PK>>
+    +expense_id : unsignedBigInteger <<FK>>
+    +item_name : string(255)
+    +quantity : integer
+    +unit_price : decimal(10,2)
+    +total_price : decimal(10,2)
+    +created_at : timestamp
+    +updated_at : timestamp
+}
+
+class ExpenseUser Model("Model") {
+    +expense_id : unsignedBigInteger <<PK,FK>>
+    +user_id : unsignedBigInteger <<PK,FK>>
+    +share_amount : decimal(10,2)
+    +share_percent : decimal(5,2)
+    +created_at : timestamp
+    +updated_at : timestamp
+}
+
+class Settlement Model("Model") {
+    +id : unsignedBigInteger <<PK>>
+    +from_user_id : unsignedBigInteger <<FK>>
+    +to_user_id : unsignedBigInteger <<FK>>
+    +amount : decimal(10,2)
+    +settled_at : timestamp
+    +created_at : timestamp
+    +updated_at : timestamp
+    +deleted_at : timestamp [0..1]
+}
+
+' IP Whitelist for allowed public IPs
+class IPWhitelist Model("Model") {
+    +id : unsignedBigInteger <<PK>>
+    +ip_address : string(45)
+    +description : string(255) [0..1]
+    +created_at : timestamp
+    +updated_at : timestamp
+}
+
+' Services for OTP and QR
+class TOTPService Service("Service") {
+    +generateSecret() : string
+    +verifyCode(secret:string, code:string) : boolean
+}
+
+class QRCodeService Service("Service") {
+    +generateQR(secret:string) : image
+}
+
+' Inheritance
+Admin --|> User
+
+' Relationships & Cardinalities
+Admin "1" -- "0..*" Expense : creates
+Expense "*" -- "1" Admin : payer
+Expense "1" -- "0..*" ExpenseItem : contains
+User "*" -- "0..*" ExpenseUser : participates
+Expense "*" -- "0..*" ExpenseUser : split
+User "1" -- "0..*" Settlement : initiates
+User "1" -- "0..*" Settlement : receives
+Admin "1" -- "0..*" IPWhitelist : manages
+
+' Authentication Flow Notes
+note right of Admin
+  - First launch: no totp_secret
+  - QRCodeService generates QR for authenticator app
+  - Admin scans QR to set up TOTP
+  - TOTPService verifies codes thereafter
+end note
+
+Admin ..> TOTPService : uses
+Admin ..> QRCodeService : uses
+
+@enduml
