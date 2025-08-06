@@ -23,6 +23,7 @@ PaySay allows office colleagues to track who paid for shared expenses, divide th
 
 ## Features
 - Expense logging and itemized breakdown
+- Individual or group sharing of expense items
 - Auto-calculated user shares
 - Payment settlements
 - TOTP-based admin authentication (no passwords)
@@ -88,6 +89,15 @@ class ExpenseItem Model("Model") {
     +updated_at : timestamp
 }
 
+class ExpenseItemUser Model("Model") {
+    +expense_item_id : unsignedBigInteger <<PK,FK>>
+    +user_id : unsignedBigInteger <<PK,FK>>
+    +share_amount : decimal(10,2)
+    +share_percent : decimal(5,2)
+    +created_at : timestamp
+    +updated_at : timestamp
+}
+
 class ExpenseUser Model("Model") {
     +expense_id : unsignedBigInteger <<PK,FK>>
     +user_id : unsignedBigInteger <<PK,FK>>
@@ -129,6 +139,8 @@ Admin --|> User
 Admin "1" -- "0..*" Expense : creates
 Expense "*" -- "1" Admin : payer
 Expense "1" -- "0..*" ExpenseItem : contains
+ExpenseItem "1" -- "0..*" ExpenseItemUser : split to users
+User "*" -- "0..*" ExpenseItemUser : owns items
 User "*" -- "0..*" ExpenseUser : participates
 Expense "*" -- "0..*" ExpenseUser : split
 User "1" -- "0..*" Settlement : initiates
@@ -158,8 +170,11 @@ Each Eloquent model has a corresponding migration. Below are the core models:
 ### ExpenseItem
 - Itemized entries for each expense
 
+### ExpenseItemUser
+- Links specific item shares to individual users
+
 ### ExpenseUser
-- Pivot table with each user’s share of an expense
+- Pivot table with each user’s share of an entire expense
 
 ### Settlement
 - Tracks payments made between users to settle balances
