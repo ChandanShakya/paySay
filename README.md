@@ -1,61 +1,196 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# PaySay - Expense Sharing System
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+PaySay is a Laravel-based expense tracking and settlement system tailored for small teams or office groups who share daily costs, like meals. The system handles expense entries, user shares, settlements, and authentication through secure OTP.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Table of Contents
+- [Overview](#overview)
+- [Features](#features)
+- [System Architecture](#system-architecture)
+- [PlantUML Diagram](#plantuml-diagram)
+- [Models & Migrations](#models--migrations)
+- [Installation](#installation)
+- [Usage](#usage)
+- [License](#license)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+---
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Overview
+PaySay allows office colleagues to track who paid for shared expenses, divide those expenses fairly, and log settlements over time. Admins manage the system securely using TOTP-based authentication, and access is limited by IP whitelisting.
 
-## Learning Laravel
+---
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Features
+- Expense logging and itemized breakdown
+- Auto-calculated user shares
+- Payment settlements
+- TOTP-based admin authentication (no passwords)
+- IP whitelist for access control
+- Simple, clear UI
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+---
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## System Architecture
+- Built with **Laravel**
+- Uses **Eloquent ORM**
+- Modular services for TOTP and QR code
+- Admin access secured with **TOTP secret** and IP control
 
-## Laravel Sponsors
+---
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## PlantUML Diagram
+The following diagram represents the full database and service structure:
 
-### Premium Partners
+```plantuml
+@startuml
+skinparam classAttributeIconSize 0
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+!define Model(x) << (M,#ADD8E6) x >>
+!define Service(x) << (S,#90EE90) x >>
 
-## Contributing
+class Admin Model("Authenticatable") {
+    +id : unsignedBigInteger <<PK>>
+    +totp_secret : string(255) [0..1]
+    +created_at : timestamp
+    +updated_at : timestamp
+    +deleted_at : timestamp [0..1]
+}
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+class User Model("Model") {
+    +id : unsignedBigInteger <<PK>>
+    +name : string(255)
+    +email : string(255)
+    +created_at : timestamp
+    +updated_at : timestamp
+}
 
-## Code of Conduct
+class Expense Model("Model") {
+    +id : unsignedBigInteger <<PK>>
+    +date : date
+    +description : string(255)
+    +total_amount : decimal(10,2)
+    +details : text
+    +payer_id : unsignedBigInteger <<FK>>
+    +created_at : timestamp
+    +updated_at : timestamp
+    +deleted_at : timestamp [0..1]
+}
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+class ExpenseItem Model("Model") {
+    +id : unsignedBigInteger <<PK>>
+    +expense_id : unsignedBigInteger <<FK>>
+    +item_name : string(255)
+    +quantity : integer
+    +unit_price : decimal(10,2)
+    +total_price : decimal(10,2)
+    +created_at : timestamp
+    +updated_at : timestamp
+}
 
-## Security Vulnerabilities
+class ExpenseUser Model("Model") {
+    +expense_id : unsignedBigInteger <<PK,FK>>
+    +user_id : unsignedBigInteger <<PK,FK>>
+    +share_amount : decimal(10,2)
+    +share_percent : decimal(5,2)
+    +created_at : timestamp
+    +updated_at : timestamp
+}
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+class Settlement Model("Model") {
+    +id : unsignedBigInteger <<PK>>
+    +from_user_id : unsignedBigInteger <<FK>>
+    +to_user_id : unsignedBigInteger <<FK>>
+    +amount : decimal(10,2)
+    +settled_at : timestamp
+    +created_at : timestamp
+    +updated_at : timestamp
+    +deleted_at : timestamp [0..1]
+}
+
+class IPWhitelist Model("Model") {
+    +id : unsignedBigInteger <<PK>>
+    +ip_address : string(45)
+    +description : string(255) [0..1]
+    +created_at : timestamp
+    +updated_at : timestamp
+}
+
+class TOTPService Service("Service") {
+    +generateSecret() : string
+    +verifyCode(secret:string, code:string) : boolean
+}
+
+class QRCodeService Service("Service") {
+    +generateQR(secret:string) : image
+}
+
+Admin --|> User
+Admin "1" -- "0..*" Expense : creates
+Expense "*" -- "1" Admin : payer
+Expense "1" -- "0..*" ExpenseItem : contains
+User "*" -- "0..*" ExpenseUser : participates
+Expense "*" -- "0..*" ExpenseUser : split
+User "1" -- "0..*" Settlement : initiates
+User "1" -- "0..*" Settlement : receives
+Admin "1" -- "0..*" IPWhitelist : manages
+Admin ..> TOTPService : uses
+Admin ..> QRCodeService : uses
+@enduml
+```
+
+---
+
+## Models & Migrations
+Each Eloquent model has a corresponding migration. Below are the core models:
+
+### Admin
+- Uses TOTP for authentication
+- No name/email/password fields
+
+### User
+- Name and email fields
+
+### Expense
+- Tracks shared expense
+- Links to user (payer)
+
+### ExpenseItem
+- Itemized entries for each expense
+
+### ExpenseUser
+- Pivot table with each user’s share of an expense
+
+### Settlement
+- Tracks payments made between users to settle balances
+
+### IPWhitelist
+- Allows access only from whitelisted public IPs
+
+---
+
+## Installation
+```bash
+git clone https://github.com/your-username/paysay.git
+cd paysay
+composer install
+cp .env.example .env
+php artisan key:generate
+php artisan migrate
+```
+
+---
+
+## Usage
+1. Access the app from a whitelisted IP
+2. Admin scans QR and sets up TOTP in an authenticator app
+3. Start logging expenses, assigning shares, and settling payments
+
+---
 
 ## License
+This project is open-source and available under the [MIT License](LICENSE).
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+---
+
+**Moto:** *"Track. Split. Settle."*
